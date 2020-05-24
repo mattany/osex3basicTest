@@ -120,6 +120,9 @@ int main() {
             auto v = new VString(str);
             inputVec.push_back({nullptr, v});
         }
+    } else {
+        std::cerr << "Bad path, please insert the correct path to the file randomstring.txt in row 10. \nWindows slashes should be escaped. \nExample: C:\\\\KimJongUn\\\\Personal\\\\nukecodes\\\\randomstring.txt" <<std::endl;
+        exit(1);
     }
 
     JobState state;
