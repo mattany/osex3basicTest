@@ -150,21 +150,6 @@ void bigFileTest() {
 
         if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
             printf("stage %d, %f%% \n", state.stage, state.percentage);
-            if (state.percentage > 100 || state.percentage < 0) {
-                std::cerr << "FAIL! Bad Percentage!" << std::endl;
-                exit(1);
-            }
-            if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
-                std::cerr << "FAIL Bad Percentage! Make sure that you are updating the atomic variable correctly."
-                          << std::endl;
-                exit(1);
-            }
-            if (last_state.stage > state.stage) {
-                std::cerr << "FAIL Bad stage! Make sure that you are updating the atomic variable correctly."
-                          << std::endl;
-                exit(1);
-            }
-
         }
         last_state = state;
         getJobState(job, &state);
@@ -328,6 +313,11 @@ void repeats() {
                 }
                 if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
                     std::cerr << "FAIL Bad Percentage! Make sure that you are updating the atomic variable correctly."
+                              << std::endl;
+                    exit(1);
+                }
+                if (last_state.stage > state.stage) {
+                    std::cerr << "FAIL Bad stage! Make sure that you are updating the atomic variable correctly."
                               << std::endl;
                     exit(1);
                 }
