@@ -8,6 +8,7 @@
 //#include <fstream>
 
 #define PATH_TO_RANDOMSTRING "/home/mattan/Desktop/os/ex3_new/randomstring.txt"
+static const int REPEATS = 10000;
 pthread_mutex_t k2ResourcesMutex = PTHREAD_MUTEX_INITIALIZER;
 
 class VString : public V1 {
@@ -102,10 +103,25 @@ public:
     }
 };
 
+void bigFileTest();
+
+void repeats();
 
 int main() {
-//    for (int i = 0; i < 10000; ++i) {
-//        std::cout<<"new run"<<i<<"\n";
+    // This test checks that the atomic counter updates correctly and can handle context switches in the middle of
+    // acquiring the stage
+    repeats();
+    bigFileTest();
+
+    exit(0);
+}
+
+
+
+
+
+
+void bigFileTest() {
     CounterClient client;
     InputVec inputVec;
     OutputVec outputVec;
@@ -129,7 +145,7 @@ int main() {
     JobState last_state = {UNDEFINED_STAGE, 0};
     JobHandle job = startMapReduceJob(client, inputVec, outputVec, 200);
     getJobState(job, &state);
-//        auto jobContext = static_cast<JobContext*>(job);
+    last_state = state;
     while (!(state.stage == REDUCE_STAGE && state.percentage == 100.0)) {
 
         if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
@@ -143,6 +159,12 @@ int main() {
                           << std::endl;
                 exit(1);
             }
+            if (last_state.stage > state.stage) {
+                std::cerr << "FAIL Bad stage! Make sure that you are updating the atomic variable correctly."
+                          << std::endl;
+                exit(1);
+            }
+
         }
         last_state = state;
         getJobState(job, &state);
@@ -150,100 +172,100 @@ int main() {
 
     closeJobHandle(job);
     std::map<char, int> expectedOutput = {{'0',  13258},
-                                                        {'1',  13014},
-                                                        {'2',  13241},
-                                                        {'3',  13246},
-                                                        {'4',  13042},
-                                                        {'5',  13479},
-                                                        {'6',  13085},
-                                                        {'7',  12949},
-                                                        {'8',  13168},
-                                                        {'9',  13033},
-                                                        {'a',  13119},
-                                                        {'b',  13078},
-                                                        {'c',  13360},
-                                                        {'d',  13126},
-                                                        {'e',  13055},
-                                                        {'f',  13460},
-                                                        {'g',  12940},
-                                                        {'h',  13231},
-                                                        {'i',  13112},
-                                                        {'j',  13063},
-                                                        {'k',  13232},
-                                                        {'l',  13016},
-                                                        {'m',  13172},
-                                                        {'n',  13161},
-                                                        {'o',  12989},
-                                                        {'p',  13148},
-                                                        {'q',  13148},
-                                                        {'r',  13200},
-                                                        {'s',  13238},
-                                                        {'t',  12964},
-                                                        {'u',  13106},
-                                                        {'v',  13334},
-                                                        {'w',  13039},
-                                                        {'x',  13202},
-                                                        {'y',  13199},
-                                                        {'z',  13010},
-                                                        {'A',  13149},
-                                                        {'B',  13103},
-                                                        {'C',  13305},
-                                                        {'D',  13132},
-                                                        {'E',  13009},
-                                                        {'F',  13217},
-                                                        {'G',  13107},
-                                                        {'H',  13050},
-                                                        {'I',  13394},
-                                                        {'J',  13248},
-                                                        {'K',  13283},
-                                                        {'L',  13129},
-                                                        {'M',  13095},
-                                                        {'N',  13190},
-                                                        {'O',  13426},
-                                                        {'P',  13187},
-                                                        {'Q',  13223},
-                                                        {'R',  13360},
-                                                        {'S',  13056},
-                                                        {'T',  13249},
-                                                        {'U',  13175},
-                                                        {'V',  13117},
-                                                        {'W',  13244},
-                                                        {'X',  13228},
-                                                        {'Y',  13023},
-                                                        {'Z',  13032},
-                                                        {'!',  13352},
-                                                        {'"',  13271},
-                                                        {'#',  13242},
-                                                        {'$',  13176},
-                                                        {'%',  13172},
-                                                        {'&',  13121},
-                                                        {'\'', 13274},
-                                                        {'(',  13250},
-                                                        {')',  13107},
-                                                        {'*',  13157},
-                                                        {'+',  13199},
-                                                        {',',  13143},
-                                                        {'-',  13206},
-                                                        {'.',  13191},
-                                                        {'/',  13266},
-                                                        {':',  13308},
-                                                        {';',  13309},
-                                                        {'<',  13158},
-                                                        {'=',  13345},
-                                                        {'>',  13061},
-                                                        {'?',  13238},
-                                                        {'@',  13130},
-                                                        {'[',  13050},
-                                                        {'\\', 13152},
-                                                        {']',  13123},
-                                                        {'^',  13143},
-                                                        {'_',  13010},
-                                                        {'`',  13226},
-                                                        {'{',  13054},
-                                                        {'|',  13043},
-                                                        {'}',  13164},
-                                                        {'~',  13234},
-                                                        {' ',  13096}};
+                                          {'1',  13014},
+                                          {'2',  13241},
+                                          {'3',  13246},
+                                          {'4',  13042},
+                                          {'5',  13479},
+                                          {'6',  13085},
+                                          {'7',  12949},
+                                          {'8',  13168},
+                                          {'9',  13033},
+                                          {'a',  13119},
+                                          {'b',  13078},
+                                          {'c',  13360},
+                                          {'d',  13126},
+                                          {'e',  13055},
+                                          {'f',  13460},
+                                          {'g',  12940},
+                                          {'h',  13231},
+                                          {'i',  13112},
+                                          {'j',  13063},
+                                          {'k',  13232},
+                                          {'l',  13016},
+                                          {'m',  13172},
+                                          {'n',  13161},
+                                          {'o',  12989},
+                                          {'p',  13148},
+                                          {'q',  13148},
+                                          {'r',  13200},
+                                          {'s',  13238},
+                                          {'t',  12964},
+                                          {'u',  13106},
+                                          {'v',  13334},
+                                          {'w',  13039},
+                                          {'x',  13202},
+                                          {'y',  13199},
+                                          {'z',  13010},
+                                          {'A',  13149},
+                                          {'B',  13103},
+                                          {'C',  13305},
+                                          {'D',  13132},
+                                          {'E',  13009},
+                                          {'F',  13217},
+                                          {'G',  13107},
+                                          {'H',  13050},
+                                          {'I',  13394},
+                                          {'J',  13248},
+                                          {'K',  13283},
+                                          {'L',  13129},
+                                          {'M',  13095},
+                                          {'N',  13190},
+                                          {'O',  13426},
+                                          {'P',  13187},
+                                          {'Q',  13223},
+                                          {'R',  13360},
+                                          {'S',  13056},
+                                          {'T',  13249},
+                                          {'U',  13175},
+                                          {'V',  13117},
+                                          {'W',  13244},
+                                          {'X',  13228},
+                                          {'Y',  13023},
+                                          {'Z',  13032},
+                                          {'!',  13352},
+                                          {'"',  13271},
+                                          {'#',  13242},
+                                          {'$',  13176},
+                                          {'%',  13172},
+                                          {'&',  13121},
+                                          {'\'', 13274},
+                                          {'(',  13250},
+                                          {')',  13107},
+                                          {'*',  13157},
+                                          {'+',  13199},
+                                          {',',  13143},
+                                          {'-',  13206},
+                                          {'.',  13191},
+                                          {'/',  13266},
+                                          {':',  13308},
+                                          {';',  13309},
+                                          {'<',  13158},
+                                          {'=',  13345},
+                                          {'>',  13061},
+                                          {'?',  13238},
+                                          {'@',  13130},
+                                          {'[',  13050},
+                                          {'\\', 13152},
+                                          {']',  13123},
+                                          {'^',  13143},
+                                          {'_',  13010},
+                                          {'`',  13226},
+                                          {'{',  13054},
+                                          {'|',  13043},
+                                          {'}',  13164},
+                                          {'~',  13234},
+                                          {' ',  13096}};
     for (OutputPair &pair: outputVec) {
         char c = ((const KChar *) pair.first)->c;
         int count = ((const VCount *) pair.second)->count;
@@ -274,7 +296,57 @@ int main() {
         auto iter = expectedOutput.begin();
         std::cout<<"(highly unlikely) you missed the letter: " << iter->first<<std::endl;
     }
-    std::cout << "PASS!" <<std::endl <<  std::endl;
+    std::cout << "PASSED FINAL TEST!" <<std::endl <<  std::endl;
     exit(0);
 }
+
+void repeats() {
+    for (int i = 0; i < REPEATS; ++i)
+    {
+        std::cout<<"repetition #"<<i<<std::endl;
+        CounterClient client;
+        InputVec inputVec;
+        OutputVec outputVec;
+        VString s1("This string is full of characters");
+        VString s2("Multithreading is awesome");
+        VString s3("conditions are race bad");
+        inputVec.push_back({nullptr, &s1});
+        inputVec.push_back({nullptr, &s2});
+        inputVec.push_back({nullptr, &s3});
+        JobState state;
+        JobState last_state={UNDEFINED_STAGE,0};
+        JobHandle job = startMapReduceJob(client, inputVec, outputVec, 3);
+        getJobState(job, &state);
+
+        while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
+        {
+            if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
+                printf("stage %d, %f%% \n", state.stage, state.percentage);
+                if (state.percentage > 100 || state.percentage < 0) {
+                    std::cerr << "FAIL! Bad Percentage!" << std::endl;
+                    exit(1);
+                }
+                if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
+                    std::cerr << "FAIL Bad Percentage! Make sure that you are updating the atomic variable correctly."
+                              << std::endl;
+                    exit(1);
+                }
+            }
+            last_state = state;
+            getJobState(job, &state);
+        }
+        printf("Done!\n");
+
+        closeJobHandle(job);
+
+        for (OutputPair& pair: outputVec) {
+            delete pair.first;
+            delete pair.second;
+        }
+    }
+}
+
+
+
+
 
