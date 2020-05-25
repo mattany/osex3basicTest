@@ -113,18 +113,18 @@ void deadlockTest();
 void errorMessageTest();
 
 int main() {
-    // This test checks that the atomic counter updates correctly and can handle context switches in the middle of
-    // acquiring the stage
+//     This test checks that the atomic counter updates correctly and can handle context switches in the middle of
+//     acquiring the stage
     progressTest();
 
-//     TODO After you pass everything else if you want to be very sure, change DEADLOCK_REPEATS to 1 million and run again (it will take some time).
+    // TODO After you pass everything else if you want to be very sure, change DEADLOCK_REPEATS to 1 million and run again (it will take some time).
     deadlockTest();
     randomTest();   // Does not check the output. Intended to catch unexpected errors.
     bigFileTest();
 
     // TODO Uncomment the following test and Run separately from the rest (comment them out) after you pass them
 
-    errorMessageTest();
+//    errorMessageTest();
 
 
     exit(0);
@@ -312,7 +312,7 @@ void bigFileTest() {
         auto iter = expectedOutput.begin();
         std::cout<<"(highly unlikely) you missed the letter: " << iter->first<<std::endl;
     }
-    std::cout << "PASSED FINAL TEST!" <<std::endl <<  std::endl;
+    std::cout << "pass! (now uncomment the last test)" <<std::endl <<  std::endl;
     exit(0);
 }
 
