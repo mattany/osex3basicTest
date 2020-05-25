@@ -115,12 +115,12 @@ void errorMessageTest();
 int main() {
     // This test checks that the atomic counter updates correctly and can handle context switches in the middle of
     // acquiring the stage
-//    progressTest();
+    progressTest();
 
-    // TODO After you pass everything else if you want to be very sure, change DEADLOCK_REPEATS to 1 million and run again (it will take some time).
-//    deadlockTest();
-//    randomTest();   // Does not check the output. Intended to catch unexpected errors.
-//    bigFileTest();
+//     TODO After you pass everything else if you want to be very sure, change DEADLOCK_REPEATS to 1 million and run again (it will take some time).
+    deadlockTest();
+    randomTest();   // Does not check the output. Intended to catch unexpected errors.
+    bigFileTest();
 
     // TODO Uncomment the following test and Run separately from the rest (comment them out) after you pass them
 
