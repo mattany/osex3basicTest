@@ -1,14 +1,15 @@
 #include "MapReduceFramework.h"
 #include <cstdio>
-//#include <string>
 #include <array>
 #include <unistd.h>
 #include <fstream>
 #include <iostream>
-//#include <fstream>
+#include <random>
 
 #define PATH_TO_RANDOMSTRING "/home/mattan/Desktop/os/ex3_new/randomstring.txt"
 static const int REPEATS = 10000;
+static const int DEADLOCK_REPEATS = 10000;
+static const int RANDOM_REPEATS = 100;
 pthread_mutex_t k2ResourcesMutex = PTHREAD_MUTEX_INITIALIZER;
 
 class VString : public V1 {
@@ -47,8 +48,6 @@ public:
     std::vector<VCount *> *resourcesV2;
 
     CounterClient() {
-//        resourcesK2 = new std::vector<KChar *>;
-//        resourcesV2 = new std::vector<VCount *>;
         resourcesK2 = new std::vector<KChar *>;
         resourcesV2 = new std::vector<VCount *>;
 
@@ -105,12 +104,18 @@ public:
 
 void bigFileTest();
 
-void repeats();
+void progressTest();
+
+void randomTest();
+
+void deadlockTest();
 
 int main() {
     // This test checks that the atomic counter updates correctly and can handle context switches in the middle of
     // acquiring the stage
-    repeats();
+    progressTest();   // Checks the atomic counter
+    deadlockTest();  // After you pass everything chage DEADLOCK_REPEATS to 1 million and run again (it will take some time).
+    randomTest();   // Does not check the output. Intended to catch unexpected errors. 
     bigFileTest();
 
     exit(0);
@@ -285,7 +290,45 @@ void bigFileTest() {
     exit(0);
 }
 
-void repeats() {
+void deadlockTest() {
+    for (int i = 0; i < DEADLOCK_REPEATS; ++i)
+    {
+        std::cout<<"repetition #"<<i<<std::endl;
+        CounterClient client;
+        InputVec inputVec;
+        OutputVec outputVec;
+        VString s1("This string is full of characters");
+        VString s2("Multithreading is awesome");
+        VString s3("conditions are race bad");
+        inputVec.push_back({nullptr, &s1});
+        inputVec.push_back({nullptr, &s2});
+        inputVec.push_back({nullptr, &s3});
+        JobState state;
+        JobState last_state={UNDEFINED_STAGE,0};
+        JobHandle job = startMapReduceJob(client, inputVec, outputVec, 3);
+        getJobState(job, &state);
+
+        while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
+        {
+//            if (last_state.stage != state.stage) {
+//                printf("stage %d \n", state.stage);
+//            }
+            last_state = state;
+            getJobState(job, &state);
+        }
+//        printf("Done!\n");
+
+        closeJobHandle(job);
+
+        for (OutputPair& pair: outputVec) {
+            delete pair.first;
+            delete pair.second;
+        }
+    }
+}
+
+
+void progressTest() {
     for (int i = 0; i < REPEATS; ++i)
     {
         std::cout<<"repetition #"<<i<<std::endl;
@@ -336,6 +379,119 @@ void repeats() {
     }
 }
 
+void randomTest() {
+    std::default_random_engine generator(time(nullptr));
+    std::uniform_int_distribution<int> bernouli(0,1);
+    std::uniform_int_distribution<int> trinary(0,2);
+    std::uniform_int_distribution<int> dist(1,1000);
+    std::uniform_int_distribution<int> concurrentJobAmount(1, 20);
+    std::vector<std::uniform_int_distribution<int>> dists;
+
+    std::uniform_int_distribution<int> large_amount(100, 10000);
+    std::uniform_int_distribution<int> small_amount(6,100);
+    std::uniform_int_distribution<int> tiny_amount(2,5);
+    dists.push_back(large_amount);
+    dists.push_back(small_amount);
+    dists.push_back(tiny_amount);
+
+
+
+    for (int i = 0; i < RANDOM_REPEATS; ++i)
+    {
+        std::vector<CounterClient*>clients;
+        std::vector<JobHandle*>jobs;
+        std::vector<InputVec*>inputs;
+        std::vector<OutputVec*>outputs;
+        std::vector<std::pair<JobState, JobState>*> jobStates; // [0]=prevstate [1]=curstate
+        std::vector<int>levels;
+        std::cout<<"repetition #"<<i<<std::endl;
+        int lineAmount = dist(generator);
+//        std::cout<<"line amount: "<<lineAmount<<std::endl;
+
+        int activeJobs = concurrentJobAmount(generator);
+//        int activeJobs = 2;
+        std::cout << "Job amount: " << activeJobs << std::endl;
+        for (int j = 0; j < activeJobs; ++j)
+        {
+//            std::cout<<"Job number: "<<j<<std::endl;
+            auto client = new CounterClient;
+            auto inputVec = new InputVec;
+            auto outputVec = new OutputVec;
+            std::vector<std::string> a;
+            std::string line;
+            std::ifstream f(PATH_TO_RANDOMSTRING);
+            if (f.is_open()) {
+                int k = 0;
+                while (getline(f, line) && k < lineAmount) {
+                    if (bernouli(generator)) {
+                        a.push_back(line);
+                        k++;
+                    }
+                }
+                for (std::string &str : a) {
+                    auto v = new VString(str);
+                    inputVec->push_back({nullptr, v});
+                }
+            } else {
+                std::cerr << "Bad path, please insert the correct path to the file randomstring.txt in row 10. \nWindows slashes should be escaped. \nExample: C:\\\\KimJongUn\\\\Personal\\\\nukecodes\\\\randomstring.txt" <<std::endl;
+                exit(1);
+            }
+            clients.push_back(client);
+            inputs.push_back(inputVec);
+            outputs.push_back(outputVec);
+            jobs.push_back(new JobHandle);
+            jobStates.push_back(new std::pair<JobState, JobState>);
+            int level = dists[trinary(generator)](generator);
+            levels.push_back(level);
+//            std::cout<<"Thread Amount: "<<level<<std::endl;
+        }
+        jobs.reserve(activeJobs);
+        for (int j = 0; j < activeJobs; ++j) {
+//            std::cout<<"job "<<j<<std::endl;
+            *jobs[j] = startMapReduceJob(*clients[j], *inputs[j], *outputs[j], levels[j]);
+        }
+        JobHandle job;
+        int totalJobs = activeJobs;
+        for (int j = 0; activeJobs > 0; ++j)
+        {
+            if (jobs[j] != nullptr) {
+                job = *jobs[j];
+                getJobState(job, &jobStates[j]->second);
+                if (!(jobStates[j]->second.stage == REDUCE_STAGE && jobStates[j]->first.percentage == 100.0)) {
+                    if (jobStates[j]->first.stage != jobStates[j]->second.stage || jobStates[j]->first.percentage != jobStates[j]->second.percentage) {
+                        std::cout<<"Job #"<<j<<". stage "<<jobStates[j]->first.stage<<" "<<jobStates[j]->first.percentage<<"%"<<std::endl;
+                    }
+                    jobStates[j]->first = jobStates[j]->second;
+                    getJobState(job, &jobStates[j]->second);
+                }
+                else {
+                    std::cout<<"DESTROYING JOB "<<j<<std::endl;
+                    closeJobHandle(job);
+                    delete clients[j];
+                    for (auto pair : *inputs[j]) {
+                        delete pair.second;
+                    }
+                    delete inputs[j];
+                    inputs[j] = nullptr;
+                    delete outputs[j];
+                    outputs[j] = nullptr;
+                    delete jobStates[j];
+                    jobStates[j] = nullptr;
+                    delete jobs[j];
+                    jobs[j] = nullptr;
+                    activeJobs--;
+                    std::cout << "DONE DESTROYING JOB "<<j<<std::endl;
+                }
+            }
+            if (j == totalJobs - 1) {
+                j = -1;
+            }
+        }
+
+        std::cout<<"done!!"<<std::endl;
+//        std::cout << "PASSED FINAL TEST!" <<std::endl <<  std::endl;
+    }
+}
 
 
 
