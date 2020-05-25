@@ -387,7 +387,7 @@ void randomTest() {
     std::uniform_int_distribution<int> concurrentJobAmount(1, 20);
     std::vector<std::uniform_int_distribution<int>> dists;
 
-    std::uniform_int_distribution<int> large_amount(100, 10000);
+    std::uniform_int_distribution<int> large_amount(100, 675);
     std::uniform_int_distribution<int> small_amount(6,100);
     std::uniform_int_distribution<int> tiny_amount(2,5);
     dists.push_back(large_amount);
