@@ -110,13 +110,22 @@ void randomTest();
 
 void deadlockTest();
 
+void errorMessageTest();
+
 int main() {
     // This test checks that the atomic counter updates correctly and can handle context switches in the middle of
     // acquiring the stage
-    progressTest();   // Checks the atomic counter
-    deadlockTest();  // After you pass everything chage DEADLOCK_REPEATS to 1 million and run again (it will take some time).
-    randomTest();   // Does not check the output. Intended to catch unexpected errors. 
+    progressTest();
+
+    // TODO After you pass everything else if you want to be very sure, change DEADLOCK_REPEATS to 1 million and run again (it will take some time).
+    deadlockTest();
+    randomTest();   // Does not check the output. Intended to catch unexpected errors.
     bigFileTest();
+
+    // TODO Uncomment the following test and Run separately from the rest (comment them out) after you pass them
+
+    //    errorMessageTest();
+
 
     exit(0);
 }
@@ -124,7 +133,24 @@ int main() {
 
 
 
-
+void errorMessageTest() {
+    std::cout<<"WHEN RUNNING ON AQUARIUM COMPUTERS, SHOULD EXIT WITH ERROR MESSAGE, SINCE MAX THREADS THRESHOLD IS EXCEEDED. "<<std::endl;
+    CounterClient client;
+    InputVec inputVec;
+    OutputVec outputVec;
+    VString s1("This string is full of characters");
+    VString s2("Multithreading is awesome");
+    VString s3("conditions are race bad");
+    inputVec.push_back({nullptr, &s1});
+    inputVec.push_back({nullptr, &s2});
+    inputVec.push_back({nullptr, &s3});
+    JobState state;
+    JobState last_state={UNDEFINED_STAGE,0};
+    JobHandle job = startMapReduceJob(client, inputVec, outputVec, 13501);
+    getJobState(job, &state);
+    printf("FAIL: NO ERROR MESSAGE PRINTED! MAKE SURE TO CHECK SYSTEM CALLS TO PTHREAD LIBRARY\n");
+    exit(1);
+}
 
 void bigFileTest() {
     CounterClient client;
