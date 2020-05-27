@@ -44,32 +44,11 @@ public:
 
 class CounterClient : public MapReduceClient {
 public:
-    std::vector<KChar *> *resourcesK2;
-    std::vector<VCount *> *resourcesV2;
-
-    CounterClient() {
-        resourcesK2 = new std::vector<KChar *>;
-        resourcesV2 = new std::vector<VCount *>;
-
-    }
-
-    ~CounterClient() {
-//        std::cout<<"freeing map reduce client"<<std::endl;
-        while (!resourcesK2->empty()) {
-            delete resourcesK2->at(0);
-            resourcesK2->erase(resourcesK2->begin());
-        }
-        delete resourcesK2;
-
-        while (!resourcesV2->empty()) {
-//            std::cout<<"v size is "<<resourcesV2->size()<<std::endl;
-            delete resourcesV2->at(0);
-            resourcesV2->erase(resourcesV2->begin());
-        }
-        delete resourcesV2;
-    }
+    mutable std::vector<std::unique_ptr<KChar>> resourcesK2;
+    mutable std::vector<std::unique_ptr<VCount>> resourcesV2;
 
     void map(const K1 *key, const V1 *value, void *context) const {
+        (void)key;
         std::array<unsigned int, 256> counts;
         counts.fill(0);
         for (const char &c : static_cast<const VString *>(value)->content) {
@@ -83,8 +62,8 @@ public:
             KChar *k2 = new KChar(i);
             VCount *v2 = new VCount(counts[i]);
             pthread_mutex_lock(&k2ResourcesMutex);
-            resourcesK2->push_back(k2);
-            resourcesV2->push_back(v2);
+            resourcesK2.emplace_back(k2);
+            resourcesV2.emplace_back(v2);
             pthread_mutex_unlock(&k2ResourcesMutex);
             emit2(k2, v2, context);
         }
