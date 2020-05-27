@@ -20,4 +20,4 @@ set(CMAKE_CXX_STANDARD 11)
 add_executable(ex3 SampleClient.cpp Barrier.cpp Barrier.h MapReduceClient.h MapReduceFramework.cpp MapReduceFramework.h)
 ```
 ### Remarks:
-- Running valgrind on the test as it is will detect memory leaks, since the bigfile test exits with exits without freeing resources. If you want to run valgrind, comment out that test and run just the first three.
+- Running valgrind on the test as it is will detect memory leaks, since the bigfile test exits without freeing resources. If you want to run valgrind, comment out that test and run just the first three.
