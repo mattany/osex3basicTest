@@ -6,7 +6,9 @@
 #include <iostream>
 #include <random>
 
-#define PATH_TO_RANDOMSTRING "/home/mattan/Desktop/os/ex3_new/randomstring.txt"
+#include <gtest/gtest.h>
+
+
 static const int REPEATS = 10000;
 static const int DEADLOCK_REPEATS = 100000;
 static const int RANDOM_REPEATS = 30;
@@ -44,32 +46,31 @@ public:
 
 class CounterClient : public MapReduceClient {
 public:
-    std::vector<KChar *> *resourcesK2;
-    std::vector<VCount *> *resourcesV2;
+    mutable std::vector<std::unique_ptr<KChar>> resourcesK2;
+    mutable std::vector<std::unique_ptr<VCount>> resourcesV2;
 
-    CounterClient() {
-        resourcesK2 = new std::vector<KChar *>;
-        resourcesV2 = new std::vector<VCount *>;
+    InputVec inputVec;
+    OutputVec outputVec;
 
-    }
+    CounterClient() : resourcesK2(), resourcesV2(), inputVec(), outputVec()
+    {}
 
-    ~CounterClient() {
-//        std::cout<<"freeing map reduce client"<<std::endl;
-        while (!resourcesK2->empty()) {
-            delete resourcesK2->at(0);
-            resourcesK2->erase(resourcesK2->begin());
+    ~CounterClient()
+    {
+        for (auto& kvp: inputVec)
+        {
+            delete kvp.first;
+            delete kvp.second;
         }
-        delete resourcesK2;
-
-        while (!resourcesV2->empty()) {
-//            std::cout<<"v size is "<<resourcesV2->size()<<std::endl;
-            delete resourcesV2->at(0);
-            resourcesV2->erase(resourcesV2->begin());
+        for (auto& kvp: outputVec)
+        {
+            delete kvp.first;
+            delete kvp.second;
         }
-        delete resourcesV2;
     }
 
     void map(const K1 *key, const V1 *value, void *context) const {
+        (void)key;
         std::array<unsigned int, 256> counts;
         counts.fill(0);
         for (const char &c : static_cast<const VString *>(value)->content) {
@@ -83,8 +84,8 @@ public:
             KChar *k2 = new KChar(i);
             VCount *v2 = new VCount(counts[i]);
             pthread_mutex_lock(&k2ResourcesMutex);
-            resourcesK2->push_back(k2);
-            resourcesV2->push_back(v2);
+            resourcesK2.emplace_back(k2);
+            resourcesV2.emplace_back(v2);
             pthread_mutex_unlock(&k2ResourcesMutex);
             emit2(k2, v2, context);
         }
@@ -102,79 +103,43 @@ public:
     }
 };
 
-void bigFileTest();
+TEST(MattanTests, errorMessageTest) {
+    CounterClient client;
+    auto s1 = new VString("This string is full of characters");
+    auto s2 = new VString("Multithreading is awesome");
+    auto s3 = new VString("conditions are race bad");
+    client.inputVec.push_back({nullptr, s1});
+    client.inputVec.push_back({nullptr, s2});
+    client.inputVec.push_back({nullptr, s3});
 
-void progressTest();
-
-void randomTest();
-
-void deadlockTest();
-
-void errorMessageTest();
-
-int main() {
-//     This test checks that the atomic counter updates correctly and can handle context switches in the middle of
-//     acquiring the stage
-    progressTest();
-
-    // TODO After you pass everything else if you want to be very sure, change DEADLOCK_REPEATS to 1 million and run again (it will take some time).
-    deadlockTest();
-    randomTest();   // Does not check the output. Intended to catch unexpected errors.
-    bigFileTest();
-
-    // TODO Uncomment the following test and Run separately from the rest (comment them out) after you pass them
-
-//    errorMessageTest();
-
-
-    exit(0);
+    ASSERT_EXIT(startMapReduceJob(client, client.inputVec, client.outputVec, 20000000),
+                ::testing::ExitedWithCode(1),
+                ::testing::MatchesRegex("system error: .*\n")
+    ) << "When starting too many threads, thread creation should fail, causing program to exit with code 1 and print an error";
 }
 
-
-
-
-void errorMessageTest() {
-    std::cout<<"WHEN RUNNING ON AQUARIUM COMPUTERS, SHOULD EXIT WITH ERROR MESSAGE, SINCE MAX THREADS THRESHOLD IS EXCEEDED. "<<std::endl;
+TEST(MattanTests, bigFileTest) {
     CounterClient client;
-    InputVec inputVec;
-    OutputVec outputVec;
-    VString s1("This string is full of characters");
-    VString s2("Multithreading is awesome");
-    VString s3("conditions are race bad");
-    inputVec.push_back({nullptr, &s1});
-    inputVec.push_back({nullptr, &s2});
-    inputVec.push_back({nullptr, &s3});
-    JobState state;
-    JobState last_state={UNDEFINED_STAGE,0};
-    JobHandle job = startMapReduceJob(client, inputVec, outputVec, 20000);
-    getJobState(job, &state);
-    printf("FAIL: NO ERROR MESSAGE PRINTED! MAKE SURE TO CHECK SYSTEM CALLS TO PTHREAD LIBRARY\n");
-    exit(1);
-}
-
-void bigFileTest() {
-    CounterClient client;
-    InputVec inputVec;
-    OutputVec outputVec;
     std::vector<std::string> a;
     std::string line;
-    std::ifstream f(PATH_TO_RANDOMSTRING);
+    std::ifstream f(RANDOM_STRINGS_PATH);
     if (f.is_open()) {
         while (getline(f, line)) {
             a.push_back(line);
         }
         for (std::string &str : a) {
             auto v = new VString(str);
-            inputVec.push_back({nullptr, v});
+            client.inputVec.push_back({nullptr, v});
         }
     } else {
-        std::cerr << "Bad path, please insert the correct path to the file randomstring.txt in row 10. \nWindows slashes should be escaped. \nExample: C:\\\\KimJongUn\\\\Personal\\\\nukecodes\\\\randomstring.txt" <<std::endl;
-        exit(1);
+      FAIL() << "(Technical error) Coludn't find strings file at " << RANDOM_STRINGS_PATH << " - maybe you deleted it by mistake?";
     }
+
+    std::cout << "Starting job" << std::endl;
 
     JobState state;
     JobState last_state = {UNDEFINED_STAGE, 0};
-    JobHandle job = startMapReduceJob(client, inputVec, outputVec, 200);
+    JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 200);
     getJobState(job, &state);
     last_state = state;
     while (!(state.stage == REDUCE_STAGE && state.percentage == 100.0)) {
@@ -282,7 +247,7 @@ void bigFileTest() {
                                           {'}',  13164},
                                           {'~',  13234},
                                           {' ',  13096}};
-    for (OutputPair &pair: outputVec) {
+    for (OutputPair &pair: client.outputVec) {
         char c = ((const KChar *) pair.first)->c;
         int count = ((const VCount *) pair.second)->count;
         printf("The character %c appeared %u time%s\n",
@@ -292,46 +257,35 @@ void bigFileTest() {
         {
             //element found;
             if (count!=iter->second) {
-                std::cout<<"FAIL: Your program reported the value "<< count << " for the key " << c << std::endl;
-                std::cout<<"the actual value is "<< iter->second << std::endl;
-                exit(1);
+                FAIL() << "Your program reported the value "<< count << " for the key " << c << std::endl
+                       << "the actual value is "<< iter->second << std::endl;
             } else {
                 expectedOutput.erase(iter);
             }
         } else {
-            std::cout<<"FAIL: The key "<<c<<" with value "<<count<<"Does not exist!" << std::endl;
-            exit(1);
+            FAIL() << "The key "<<c<<" with value "<<count<<"Does not exist!" << std::endl;
         }
-        delete pair.first;
-        delete pair.second;
-    }
-    for (auto pair : inputVec) {
-        delete pair.second;
     }
     if (expectedOutput.size() > 0) {
         auto iter = expectedOutput.begin();
-        std::cout<<"(highly unlikely) you missed the letter: " << iter->first<<std::endl;
+        FAIL() << "Your program has missed " << expectedOutput.size() << " letters, the first letter you missed is: " << iter->first << " whose count should be " << iter->second;
     }
-    std::cout << "pass! (now uncomment the last test)" <<std::endl <<  std::endl;
-    exit(0);
 }
 
-void deadlockTest() {
+TEST(MattanTests, deadlockTest) {
     for (int i = 0; i < DEADLOCK_REPEATS; ++i)
     {
-        std::cout<<"repetition #"<<i<<std::endl;
+        // std::cout<<"repetition #"<<i<<std::endl;
         CounterClient client;
-        InputVec inputVec;
-        OutputVec outputVec;
-        VString s1("This string is full of characters");
-        VString s2("Multithreading is awesome");
-        VString s3("conditions are race bad");
-        inputVec.push_back({nullptr, &s1});
-        inputVec.push_back({nullptr, &s2});
-        inputVec.push_back({nullptr, &s3});
+        auto s1 = new VString("This string is full of characters");
+        auto s2 = new VString("Multithreading is awesome");
+        auto s3 = new VString("conditions are race bad");
+        client.inputVec.push_back({nullptr, s1});
+        client.inputVec.push_back({nullptr, s2});
+        client.inputVec.push_back({nullptr, s3});
         JobState state;
         JobState last_state={UNDEFINED_STAGE,0};
-        JobHandle job = startMapReduceJob(client, inputVec, outputVec, 3);
+        JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 3);
         getJobState(job, &state);
 
         while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
@@ -346,30 +300,24 @@ void deadlockTest() {
 
         closeJobHandle(job);
 
-        for (OutputPair& pair: outputVec) {
-            delete pair.first;
-            delete pair.second;
-        }
     }
 }
 
 
-void progressTest() {
+TEST(MattanTests, progressTest) {
     for (int i = 0; i < REPEATS; ++i)
     {
         std::cout<<"repetition #"<<i<<std::endl;
         CounterClient client;
-        InputVec inputVec;
-        OutputVec outputVec;
-        VString s1("This string is full of characters");
-        VString s2("Multithreading is awesome");
-        VString s3("conditions are race bad");
-        inputVec.push_back({nullptr, &s1});
-        inputVec.push_back({nullptr, &s2});
-        inputVec.push_back({nullptr, &s3});
+        auto s1 = new VString("This string is full of characters");
+        auto s2 = new VString("Multithreading is awesome");
+        auto s3 = new VString("conditions are race bad");
+        client.inputVec.push_back({nullptr, s1});
+        client.inputVec.push_back({nullptr, s2});
+        client.inputVec.push_back({nullptr, s3});
         JobState state;
         JobState last_state={UNDEFINED_STAGE,0};
-        JobHandle job = startMapReduceJob(client, inputVec, outputVec, 3);
+        JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 3);
         getJobState(job, &state);
 
         while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
@@ -377,18 +325,13 @@ void progressTest() {
             if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
                 printf("stage %d, %f%% \n", state.stage, state.percentage);
                 if (state.percentage > 100 || state.percentage < 0) {
-                    std::cerr << "FAIL! Bad Percentage!" << std::endl;
-                    exit(1);
+                    FAIL() << "Invalid percentage(not in 0-100): " << state.percentage << ", encountered during stage " << state.stage << ")";
                 }
                 if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
-                    std::cerr << "FAIL Bad Percentage! Make sure that you are updating the atomic variable correctly."
-                              << std::endl;
-                    exit(1);
+                    FAIL() << "Bad percentage(smaller than previous percentage at same stage): " << state.percentage << ", encountered during stage " << state.stage << ")";
                 }
                 if (last_state.stage > state.stage) {
-                    std::cerr << "FAIL Bad stage! Make sure that you are updating the atomic variable correctly."
-                              << std::endl;
-                    exit(1);
+                    FAIL() << "Bad stage " << state.stage << " - smaller than previous stage, encountered with percentage " << state.percentage;
                 }
             }
             last_state = state;
@@ -398,14 +341,10 @@ void progressTest() {
 
         closeJobHandle(job);
 
-        for (OutputPair& pair: outputVec) {
-            delete pair.first;
-            delete pair.second;
-        }
     }
 }
 
-void randomTest() {
+TEST(MattanTests, randomTest) {
     std::default_random_engine generator(time(nullptr));
     std::uniform_int_distribution<int> bernouli(0,1);
     std::uniform_int_distribution<int> trinary(0,2);
@@ -424,28 +363,24 @@ void randomTest() {
 
     for (int i = 0; i < RANDOM_REPEATS; ++i)
     {
-        std::vector<CounterClient*>clients;
-        std::vector<JobHandle*>jobs;
-        std::vector<InputVec*>inputs;
-        std::vector<OutputVec*>outputs;
-        std::vector<std::pair<JobState, JobState>*> jobStates; // [0]=prevstate [1]=curstate
+        int activeJobs = concurrentJobAmount(generator);
+        std::cout << "Job amount: " << activeJobs << std::endl;
+
+        std::vector<CounterClient>clients(activeJobs);
+        std::vector<JobHandle>jobs(activeJobs, nullptr);
+        std::vector<std::pair<JobState, JobState>> jobStates(activeJobs); // [0]=prevstate [1]=curstate
         std::vector<int>levels;
         std::cout<<"repetition #"<<i<<std::endl;
         int lineAmount = dist(generator);
 //        std::cout<<"line amount: "<<lineAmount<<std::endl;
 
-        int activeJobs = concurrentJobAmount(generator);
-//        int activeJobs = 2;
-        std::cout << "Job amount: " << activeJobs << std::endl;
         for (int j = 0; j < activeJobs; ++j)
         {
 //            std::cout<<"Job number: "<<j<<std::endl;
-            auto client = new CounterClient;
-            auto inputVec = new InputVec;
-            auto outputVec = new OutputVec;
+            auto& client = clients.at(j);
             std::vector<std::string> a;
             std::string line;
-            std::ifstream f(PATH_TO_RANDOMSTRING);
+            std::ifstream f(RANDOM_STRINGS_PATH);
             if (f.is_open()) {
                 int k = 0;
                 while (getline(f, line) && k < lineAmount) {
@@ -456,57 +391,40 @@ void randomTest() {
                 }
                 for (std::string &str : a) {
                     auto v = new VString(str);
-                    inputVec->push_back({nullptr, v});
+                    client.inputVec.push_back({nullptr, v});
                 }
             } else {
-                std::cerr << "Bad path, please insert the correct path to the file randomstring.txt in row 10. \nWindows slashes should be escaped. \nExample: C:\\\\KimJongUn\\\\Personal\\\\nukecodes\\\\randomstring.txt" <<std::endl;
-                exit(1);
+                FAIL() << "(Technical error) Coludn't find strings file at " << RANDOM_STRINGS_PATH << " - maybe you deleted it by mistake?";
             }
-            clients.push_back(client);
-            inputs.push_back(inputVec);
-            outputs.push_back(outputVec);
-            jobs.push_back(new JobHandle);
-            jobStates.push_back(new std::pair<JobState, JobState>);
             int level = dists[trinary(generator)](generator);
             levels.push_back(level);
 //            std::cout<<"Thread Amount: "<<level<<std::endl;
         }
+
         jobs.reserve(activeJobs);
         for (int j = 0; j < activeJobs; ++j) {
 //            std::cout<<"job "<<j<<std::endl;
-            *jobs[j] = startMapReduceJob(*clients[j], *inputs[j], *outputs[j], levels[j]);
+            auto& client = clients[j];
+            JobHandle handle = startMapReduceJob(client, client.inputVec, client.outputVec, levels[j]);
+            jobs[j] = handle;
         }
-        JobHandle job;
         int totalJobs = activeJobs;
         for (int j = 0; activeJobs > 0; ++j)
         {
             if (jobs[j] != nullptr) {
-                job = *jobs[j];
-                getJobState(job, &jobStates[j]->second);
-                if (!(jobStates[j]->second.stage == REDUCE_STAGE && jobStates[j]->first.percentage == 100.0)) {
-                    if (jobStates[j]->first.stage != jobStates[j]->second.stage || jobStates[j]->first.percentage != jobStates[j]->second.percentage) {
-                        std::cout<<"Job #"<<j<<". stage "<<jobStates[j]->first.stage<<" "<<jobStates[j]->first.percentage<<"%"<<std::endl;
+                JobHandle job = jobs[j];
+                getJobState(job, &jobStates[j].second);
+                if (!(jobStates[j].second.stage == REDUCE_STAGE && jobStates[j].first.percentage == 100.0)) {
+                    if (jobStates[j].first.stage != jobStates[j].second.stage || jobStates[j].first.percentage != jobStates[j].second.percentage) {
+                        std::cout<<"Job #"<<j<<". stage "<<jobStates[j].first.stage<<" "<<jobStates[j].first.percentage<<"%"<<std::endl;
                     }
-                    jobStates[j]->first = jobStates[j]->second;
-                    getJobState(job, &jobStates[j]->second);
+                    jobStates[j].first = jobStates[j].second;
+                    getJobState(job, &jobStates[j].second);
                 }
                 else {
-                    std::cout<<"DESTROYING JOB "<<j<<std::endl;
                     closeJobHandle(job);
-                    delete clients[j];
-                    for (auto pair : *inputs[j]) {
-                        delete pair.second;
-                    }
-                    delete inputs[j];
-                    inputs[j] = nullptr;
-                    delete outputs[j];
-                    outputs[j] = nullptr;
-                    delete jobStates[j];
-                    jobStates[j] = nullptr;
-                    delete jobs[j];
                     jobs[j] = nullptr;
                     activeJobs--;
-                    std::cout << "DONE DESTROYING JOB "<<j<<std::endl;
                 }
             }
             if (j == totalJobs - 1) {
@@ -514,8 +432,6 @@ void randomTest() {
             }
         }
 
-        std::cout<<"done!!"<<std::endl;
-//        std::cout << "PASSED FINAL TEST!" <<std::endl <<  std::endl;
     }
 }
 
