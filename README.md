@@ -9,7 +9,7 @@ tester for HUJI OS 2020 exercise 3
    git clone https://github.com/mattany/osex3basicTest mattanTests
    ```
    
-2. Use the following `CMakeLists.txt` in your project root
+2. Use the following `CMakeLists.txt` in your project root. Add your own source files as needed at row 26
 
     ``` cmake
 
