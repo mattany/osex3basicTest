@@ -6,7 +6,7 @@ tester for HUJI OS 2020 exercise 3
    
    ```shell
    cd YOUR_PROJECT_ROOT_FOLDER
-   git clone https://github.com/mattany/osex3basicTest mattanTests`
+   git clone https://github.com/mattany/osex3basicTest mattanTests
    ```
    
 2. Use the following `CMakeLists.txt` in your project root
@@ -62,7 +62,7 @@ tester for HUJI OS 2020 exercise 3
     **Valgrind is not recommended, prefer using ASan as it is much faser.**
     
     It is recommended that you also test your program with high optimization levels, by adding `-O2` to `target_compile_options`,
-    and to print statements in your code(if you have any), as well as asserts (by adding `-DNDEBUG`), as these things affect the program's
+    and to delete print statements in your code(if you have any), as well as asserts (by using `-DNDEBUG` flag), as these things affect the program's
     behavior and can uncover multi-threading bugs.
 
 3. If using CLion, reload the cmake project(under `File`) after doing the above, then compile(`Build | Build 'All'`)
@@ -86,6 +86,6 @@ tester for HUJI OS 2020 exercise 3
    make -j 4
    ```
    
-   And run via `YOUR_PROJECT_ROOT/cmake-build-debug/mattanTests/mattanTester --gtest_filter="-*error**` (without 'errorMessageTest',
+   And run via `YOUR_PROJECT_ROOT/cmake-build-debug/mattanTests/mattanTester --gtest_filter="-*error*"` (without 'errorMessageTest',
    supports ASan/TSan), omit the gtest_filter to run the errorMessageTest too, but note that it will fail if you have a sanitizer enabled
    in your CMakeLists.
