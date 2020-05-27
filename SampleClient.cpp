@@ -6,7 +6,9 @@
 #include <iostream>
 #include <random>
 
-#define PATH_TO_RANDOMSTRING "/home/mattan/Desktop/os/ex3_new/randomstring.txt"
+#include <gtest/gtest.h>
+
+
 static const int REPEATS = 10000;
 static const int DEADLOCK_REPEATS = 10000;
 static const int RANDOM_REPEATS = 100;
@@ -81,39 +83,7 @@ public:
     }
 };
 
-void bigFileTest();
-
-void progressTest();
-
-void randomTest();
-
-void deadlockTest();
-
-void errorMessageTest();
-
-int main() {
-//     This test checks that the atomic counter updates correctly and can handle context switches in the middle of
-//     acquiring the stage
-    progressTest();
-
-    // TODO After you pass everything else if you want to be very sure, change DEADLOCK_REPEATS to 1 million and run again (it will take some time).
-    deadlockTest();
-    randomTest();   // Does not check the output. Intended to catch unexpected errors.
-    bigFileTest();
-
-    // TODO Uncomment the following test and Run separately from the rest (comment them out) after you pass them
-
-//    errorMessageTest();
-
-
-    exit(0);
-}
-
-
-
-
-void errorMessageTest() {
-    std::cout<<"WHEN RUNNING ON AQUARIUM COMPUTERS, SHOULD EXIT WITH ERROR MESSAGE, SINCE MAX THREADS THRESHOLD IS EXCEEDED. "<<std::endl;
+TEST(MattanTests, errorMessageTest) {
     CounterClient client;
     InputVec inputVec;
     OutputVec outputVec;
@@ -123,21 +93,20 @@ void errorMessageTest() {
     inputVec.push_back({nullptr, &s1});
     inputVec.push_back({nullptr, &s2});
     inputVec.push_back({nullptr, &s3});
-    JobState state;
-    JobState last_state={UNDEFINED_STAGE,0};
-    JobHandle job = startMapReduceJob(client, inputVec, outputVec, 20000);
-    getJobState(job, &state);
-    printf("FAIL: NO ERROR MESSAGE PRINTED! MAKE SURE TO CHECK SYSTEM CALLS TO PTHREAD LIBRARY\n");
-    exit(1);
+
+    ASSERT_EXIT(startMapReduceJob(client, inputVec, outputVec, 20000000),
+                ::testing::ExitedWithCode(1),
+                ::testing::MatchesRegex("system error: .*\n")
+    ) << "When starting too many threads, thread creation should fail, causing program to exit with code 1 and print an error";
 }
 
-void bigFileTest() {
+TEST(MattanTests, bigFileTest) {
     CounterClient client;
     InputVec inputVec;
     OutputVec outputVec;
     std::vector<std::string> a;
     std::string line;
-    std::ifstream f(PATH_TO_RANDOMSTRING);
+    std::ifstream f(RANDOM_STRINGS_PATH);
     if (f.is_open()) {
         while (getline(f, line)) {
             a.push_back(line);
@@ -147,9 +116,10 @@ void bigFileTest() {
             inputVec.push_back({nullptr, v});
         }
     } else {
-        std::cerr << "Bad path, please insert the correct path to the file randomstring.txt in row 10. \nWindows slashes should be escaped. \nExample: C:\\\\KimJongUn\\\\Personal\\\\nukecodes\\\\randomstring.txt" <<std::endl;
-        exit(1);
+      FAIL() << "(Technical error) Coludn't find strings file at " << RANDOM_STRINGS_PATH << " - maybe you deleted it by mistake?";
     }
+
+    std::cout << "Starting job" << std::endl;
 
     JobState state;
     JobState last_state = {UNDEFINED_STAGE, 0};
@@ -271,15 +241,13 @@ void bigFileTest() {
         {
             //element found;
             if (count!=iter->second) {
-                std::cout<<"FAIL: Your program reported the value "<< count << " for the key " << c << std::endl;
-                std::cout<<"the actual value is "<< iter->second << std::endl;
-                exit(1);
+                FAIL() << "Your program reported the value "<< count << " for the key " << c << std::endl
+                       << "the actual value is "<< iter->second << std::endl;
             } else {
                 expectedOutput.erase(iter);
             }
         } else {
-            std::cout<<"FAIL: The key "<<c<<" with value "<<count<<"Does not exist!" << std::endl;
-            exit(1);
+            FAIL() << "The key "<<c<<" with value "<<count<<"Does not exist!" << std::endl;
         }
         delete pair.first;
         delete pair.second;
@@ -289,16 +257,14 @@ void bigFileTest() {
     }
     if (expectedOutput.size() > 0) {
         auto iter = expectedOutput.begin();
-        std::cout<<"(highly unlikely) you missed the letter: " << iter->first<<std::endl;
+        FAIL() << "Your program has missed " << expectedOutput.size() << " letters, the first letter you missed is: " << iter->first << " whose count should be " << iter->second;
     }
-    std::cout << "pass! (now uncomment the last test)" <<std::endl <<  std::endl;
-    exit(0);
 }
 
-void deadlockTest() {
+TEST(MattanTests, deadlockTest) {
     for (int i = 0; i < DEADLOCK_REPEATS; ++i)
     {
-        std::cout<<"repetition #"<<i<<std::endl;
+        // std::cout<<"repetition #"<<i<<std::endl;
         CounterClient client;
         InputVec inputVec;
         OutputVec outputVec;
@@ -333,7 +299,7 @@ void deadlockTest() {
 }
 
 
-void progressTest() {
+TEST(MattanTests, progressTest) {
     for (int i = 0; i < REPEATS; ++i)
     {
         std::cout<<"repetition #"<<i<<std::endl;
@@ -356,18 +322,13 @@ void progressTest() {
             if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
                 printf("stage %d, %f%% \n", state.stage, state.percentage);
                 if (state.percentage > 100 || state.percentage < 0) {
-                    std::cerr << "FAIL! Bad Percentage!" << std::endl;
-                    exit(1);
+                    FAIL() << "Invalid percentage(not in 0-100): " << state.percentage << ", encountered during stage " << state.stage << ")";
                 }
                 if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
-                    std::cerr << "FAIL Bad Percentage! Make sure that you are updating the atomic variable correctly."
-                              << std::endl;
-                    exit(1);
+                    FAIL() << "Bad percentage(smaller than previous percentage at same stage): " << state.percentage << ", encountered during stage " << state.stage << ")";
                 }
                 if (last_state.stage > state.stage) {
-                    std::cerr << "FAIL Bad stage! Make sure that you are updating the atomic variable correctly."
-                              << std::endl;
-                    exit(1);
+                    FAIL() << "Bad stage " << state.stage << " - smaller than previous stage, encountered with percentage " << state.percentage;
                 }
             }
             last_state = state;
@@ -384,7 +345,7 @@ void progressTest() {
     }
 }
 
-void randomTest() {
+TEST(MattanTests, randomTest) {
     std::default_random_engine generator(time(nullptr));
     std::uniform_int_distribution<int> bernouli(0,1);
     std::uniform_int_distribution<int> trinary(0,2);
@@ -424,7 +385,7 @@ void randomTest() {
             auto outputVec = new OutputVec;
             std::vector<std::string> a;
             std::string line;
-            std::ifstream f(PATH_TO_RANDOMSTRING);
+            std::ifstream f(RANDOM_STRINGS_PATH);
             if (f.is_open()) {
                 int k = 0;
                 while (getline(f, line) && k < lineAmount) {
@@ -438,8 +399,7 @@ void randomTest() {
                     inputVec->push_back({nullptr, v});
                 }
             } else {
-                std::cerr << "Bad path, please insert the correct path to the file randomstring.txt in row 10. \nWindows slashes should be escaped. \nExample: C:\\\\KimJongUn\\\\Personal\\\\nukecodes\\\\randomstring.txt" <<std::endl;
-                exit(1);
+                FAIL() << "(Technical error) Coludn't find strings file at " << RANDOM_STRINGS_PATH << " - maybe you deleted it by mistake?";
             }
             clients.push_back(client);
             inputs.push_back(inputVec);
