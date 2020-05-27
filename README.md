@@ -16,7 +16,6 @@ tester for HUJI OS 2020 exercise 3
     cmake_minimum_required(VERSION 3.1)
 
 
-
     # NOTE: You can't have both ThreadSanitizer and AddressSanitizer enabled at the same time.
 
     # Uncomment the following to enable ThreadSanitizer.
