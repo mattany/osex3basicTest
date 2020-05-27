@@ -8,8 +8,8 @@
 
 #define PATH_TO_RANDOMSTRING "/home/mattan/Desktop/os/ex3_new/randomstring.txt"
 static const int REPEATS = 10000;
-static const int DEADLOCK_REPEATS = 10000;
-static const int RANDOM_REPEATS = 100;
+static const int DEADLOCK_REPEATS = 100000;
+static const int RANDOM_REPEATS = 30;
 pthread_mutex_t k2ResourcesMutex = PTHREAD_MUTEX_INITIALIZER;
 
 class VString : public V1 {
