@@ -9,9 +9,9 @@
 #include <gtest/gtest.h>
 
 
-static const int REPEATS = 10000;
-static const int DEADLOCK_REPEATS = 100000;
-static const int RANDOM_REPEATS = 100;
+//static const int REPEATS = 10000;
+//static const int DEADLOCK_REPEATS = 1000000;
+static const int RANDOM_REPEATS = 1000;
 pthread_mutex_t k2ResourcesMutex = PTHREAD_MUTEX_INITIALIZER;
 
 class VString : public V1 {
@@ -103,6 +103,7 @@ public:
     }
 };
 
+
 TEST(MattanTests, errorMessageTest) {
     CounterClient client;
     auto s1 = new VString("This string is full of characters");
@@ -118,7 +119,7 @@ TEST(MattanTests, errorMessageTest) {
     ) << "When starting too many threads, thread creation should fail, causing program to exit with code 1 and print an error";
 }
 
-TEST(MattanTests, bigFileTest) {
+TEST(MattanTests, outputTest) {
     CounterClient client;
     std::vector<std::string> a;
     std::string line;
@@ -272,78 +273,6 @@ TEST(MattanTests, bigFileTest) {
     }
 }
 
-TEST(MattanTests, deadlockTest) {
-    for (int i = 0; i < DEADLOCK_REPEATS; ++i)
-    {
-        // std::cout<<"repetition #"<<i<<std::endl;
-        CounterClient client;
-        auto s1 = new VString("This string is full of characters");
-        auto s2 = new VString("Multithreading is awesome");
-        auto s3 = new VString("conditions are race bad");
-        client.inputVec.push_back({nullptr, s1});
-        client.inputVec.push_back({nullptr, s2});
-        client.inputVec.push_back({nullptr, s3});
-        JobState state;
-        JobState last_state={UNDEFINED_STAGE,0};
-        JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 3);
-        getJobState(job, &state);
-
-        while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
-        {
-//            if (last_state.stage != state.stage) {
-//                printf("stage %d \n", state.stage);
-//            }
-            last_state = state;
-            getJobState(job, &state);
-        }
-//        printf("Done!\n");
-
-        closeJobHandle(job);
-
-    }
-}
-
-
-TEST(MattanTests, progressTest) {
-    for (int i = 0; i < REPEATS; ++i)
-    {
-        std::cout<<"repetition #"<<i<<std::endl;
-        CounterClient client;
-        auto s1 = new VString("This string is full of characters");
-        auto s2 = new VString("Multithreading is awesome");
-        auto s3 = new VString("conditions are race bad");
-        client.inputVec.push_back({nullptr, s1});
-        client.inputVec.push_back({nullptr, s2});
-        client.inputVec.push_back({nullptr, s3});
-        JobState state;
-        JobState last_state={UNDEFINED_STAGE,0};
-        JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 3);
-        getJobState(job, &state);
-
-        while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
-        {
-            if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
-                printf("stage %d, %f%% \n", state.stage, state.percentage);
-                if (state.percentage > 100 || state.percentage < 0) {
-                    FAIL() << "Invalid percentage(not in 0-100): " << state.percentage << ", encountered during stage " << state.stage << ")";
-                }
-                if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
-                    FAIL() << "Bad percentage(smaller than previous percentage at same stage): " << state.percentage << ", encountered during stage " << state.stage << ")";
-                }
-                if (last_state.stage > state.stage) {
-                    FAIL() << "Bad stage " << state.stage << " - smaller than previous stage, encountered with percentage " << state.percentage;
-                }
-            }
-            last_state = state;
-            getJobState(job, &state);
-        }
-        printf("Done!\n");
-
-        closeJobHandle(job);
-
-    }
-}
-
 TEST(MattanTests, randomTest) {
     std::default_random_engine generator(time(nullptr));
     std::uniform_int_distribution<int> bernouli(0,1);
@@ -364,7 +293,7 @@ TEST(MattanTests, randomTest) {
     for (int i = 0; i < RANDOM_REPEATS; ++i)
     {
         int activeJobs = concurrentJobAmount(generator);
-        std::cout << "Job amount: " << activeJobs << std::endl;
+//        std::cout << "Job amount: " << activeJobs << std::endl;
 
         std::vector<CounterClient>clients(activeJobs);
         std::vector<JobHandle>jobs(activeJobs, nullptr);
@@ -413,13 +342,29 @@ TEST(MattanTests, randomTest) {
         {
             if (jobs[j] != nullptr) {
                 JobHandle job = jobs[j];
-                getJobState(job, &jobStates[j].second);
-                if (!(jobStates[j].second.stage == REDUCE_STAGE && jobStates[j].first.percentage == 100.0)) {
-                    if (jobStates[j].first.stage != jobStates[j].second.stage || jobStates[j].first.percentage != jobStates[j].second.percentage) {
-                        std::cout<<"Job #"<<j<<". stage "<<jobStates[j].first.stage<<" "<<jobStates[j].first.percentage<<"%"<<std::endl;
+                JobState &state = jobStates[j].second;
+                getJobState(job, &state);
+                JobState &last_state = jobStates[j].first;
+                if (!(state.stage == REDUCE_STAGE && last_state.percentage == 100.0)) {
+                    if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
+                        if (state.percentage > 100 || state.percentage < 0) {
+                            FAIL() << "Invalid percentage(not in 0-100): " <<
+                                   "Current stage:" << state.stage << " "<< state.percentage << "%" << std::endl <<
+                                   "Previous stage: " <<last_state.stage <<  last_state.percentage << "%" << std::endl;
+                        }
+                        if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
+                            FAIL() << "Bad percentage(smaller than previous percentage at same stage): "<<
+                                   "Current stage:" << state.stage << " "<< state.percentage << "%" << std::endl <<
+                                   "Previous stage:" <<last_state.stage <<  last_state.percentage << "%" << std::endl;
+                        }
+                        if (last_state.stage > state.stage) {
+                            FAIL() << "Bad stage: " <<
+                                   "Current stage:" << state.stage << " "<< state.percentage << "%" << std::endl <<
+                                   "Previous stage:" <<last_state.stage <<  last_state.percentage << "%" << std::endl;
+                        }
                     }
-                    jobStates[j].first = jobStates[j].second;
-                    getJobState(job, &jobStates[j].second);
+                    last_state = state;
+                    getJobState(job, &state);
                 }
                 else {
                     closeJobHandle(job);
@@ -434,6 +379,72 @@ TEST(MattanTests, randomTest) {
 
     }
 }
+
+//
+//TEST(MattanTests, progressTest) {
+//    for (int i = 0; i < REPEATS; ++i)
+//    {
+//        std::cout<<"repetition #"<<i<<std::endl;
+//        CounterClient client;
+//        auto s1 = new VString("This string is full of characters");
+//        auto s2 = new VString("Multithreading is awesome");
+//        auto s3 = new VString("conditions are race bad");
+//        client.inputVec.push_back({nullptr, s1});
+//        client.inputVec.push_back({nullptr, s2});
+//        client.inputVec.push_back({nullptr, s3});
+//        JobState state;
+//        JobState last_state={UNDEFINED_STAGE,0};
+//        JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 6);
+//        getJobState(job, &state);
+//
+//        while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
+//        {
+//            if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
+//                printf("stage %d, %f%% \n", state.stage, state.percentage);
+//                if (state.percentage > 100 || state.percentage < 0) {
+//                    FAIL() << "Invalid percentage(not in 0-100): " << state.percentage << ", encountered during stage " << state.stage << ")";
+//                }
+//                if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
+//                    FAIL() << "Bad percentage(smaller than previous percentage at same stage): " << state.percentage << ", encountered during stage " << state.stage << ")";
+//                }
+//                if (last_state.stage > state.stage) {
+//                    FAIL() << "Bad stage " << state.stage << " - smaller than previous stage, encountered with percentage " << state.percentage;
+//                }
+//            }
+//            last_state = state;
+//            getJobState(job, &state);
+//        }
+//        printf("Done!\n");
+//
+//        closeJobHandle(job);
+//
+//    }
+//}
+
+//TEST(MattanTests, deadlockTest) {
+//    for (int i = 0; i < DEADLOCK_REPEATS; ++i)
+//    {
+//        std::cout<<"repetition #"<<i<<std::endl;
+//        CounterClient client;
+//        auto s1 = new VString("This string is full of characters");
+//        auto s2 = new VString("Multithreading is awesome");
+//        auto s3 = new VString("conditions are race bad");
+//        client.inputVec.push_back({nullptr, s1});
+//        client.inputVec.push_back({nullptr, s2});
+//        client.inputVec.push_back({nullptr, s3});
+//        JobState state;
+//        JobState last_state={UNDEFINED_STAGE,0};
+//        JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 3);
+//        getJobState(job, &state);
+//        while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
+//        {
+//            last_state = state;
+//            getJobState(job, &state);
+//        }
+//        closeJobHandle(job);
+//    }
+//}
+
 
 
 
