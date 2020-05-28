@@ -11,7 +11,7 @@
 
 //static const int REPEATS = 10000;
 //static const int DEADLOCK_REPEATS = 1000000;
-static const int RANDOM_REPEATS = 1000;
+static const int RANDOM_REPEATS = 100;
 pthread_mutex_t k2ResourcesMutex = PTHREAD_MUTEX_INITIALIZER;
 
 class VString : public V1 {
