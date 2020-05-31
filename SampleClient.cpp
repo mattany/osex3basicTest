@@ -350,17 +350,17 @@ TEST(MattanTests, randomTest) {
                         if (state.percentage > 100 || state.percentage < 0) {
                             FAIL() << "Invalid percentage(not in 0-100): " <<
                                    "Current stage:" << state.stage << " "<< state.percentage << "%" << std::endl <<
-                                   "Previous stage: " <<last_state.stage <<  last_state.percentage << "%" << std::endl;
+                                   "Previous stage: " <<last_state.stage << " "<< last_state.percentage << "%" << std::endl;
                         }
                         if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
                             FAIL() << "Bad percentage(smaller than previous percentage at same stage): "<<
                                    "Current stage:" << state.stage << " "<< state.percentage << "%" << std::endl <<
-                                   "Previous stage:" <<last_state.stage <<  last_state.percentage << "%" << std::endl;
+                                   "Previous stage:" <<last_state.stage << " "<<  last_state.percentage << "%" << std::endl;
                         }
                         if (last_state.stage > state.stage) {
                             FAIL() << "Bad stage: " <<
                                    "Current stage:" << state.stage << " "<< state.percentage << "%" << std::endl <<
-                                   "Previous stage:" <<last_state.stage <<  last_state.percentage << "%" << std::endl;
+                                   "Previous stage:" <<last_state.stage<< " "<<  last_state.percentage << "%" << std::endl;
                         }
                     }
                     last_state = state;
@@ -378,6 +378,26 @@ TEST(MattanTests, randomTest) {
         }
 
     }
+}
+
+TEST(MattanTests, waitAndCloseTest) {
+
+    CounterClient client;
+    auto s1 = new VString("This string is full of characters");
+    auto s2 = new VString("Multithreading is awesome");
+    auto s3 = new VString("conditions are race bad");
+    client.inputVec.push_back({nullptr, s1});
+    client.inputVec.push_back({nullptr, s2});
+    client.inputVec.push_back({nullptr, s3});
+    JobState state;
+    JobState last_state={UNDEFINED_STAGE,0};
+    JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 3);
+    getJobState(job, &state);
+    waitForJob(job);
+
+    // Should work without system error, since we are supposed to check if join has already been called.
+    closeJobHandle(job);
+
 }
 
 //
