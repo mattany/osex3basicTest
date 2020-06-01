@@ -105,6 +105,25 @@ public:
 	}
 };
 
+TEST(MattanTests, waitAndCloseTest) {
+
+    CounterClient client;
+    auto s1 = new VString("This string is full of characters");
+    auto s2 = new VString("Multithreading is awesome");
+    auto s3 = new VString("conditions are race bad");
+    client.inputVec.push_back({nullptr, s1});
+    client.inputVec.push_back({nullptr, s2});
+    client.inputVec.push_back({nullptr, s3});
+    JobState state;
+    JobState last_state={UNDEFINED_STAGE,0};
+    JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 3);
+    getJobState(job, &state);
+    waitForJob(job);
+
+    // Should work without system error, since we are supposed to check if join has already been called.
+    closeJobHandle(job);
+
+}
 
 TEST(MattanTests, errorMessageTest) {
 	CounterClient client;
@@ -275,6 +294,71 @@ TEST(MattanTests, outputTest) {
 }
 
 
+
+TEST(MattanTests, progressTest) {
+    for (int i = 0; i < REPEATS; ++i)
+    {
+        std::cout<<"repetition #"<<i<<std::endl;
+        CounterClient client;
+        auto s1 = new VString("This string is full of characters");
+        auto s2 = new VString("Multithreading is awesome");
+        auto s3 = new VString("conditions are race bad");
+        client.inputVec.push_back({nullptr, s1});
+        client.inputVec.push_back({nullptr, s2});
+        client.inputVec.push_back({nullptr, s3});
+        JobState state;
+        JobState last_state={UNDEFINED_STAGE,0};
+        JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 6);
+        getJobState(job, &state);
+
+        while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
+        {
+            if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
+                printf("stage %d, %f%% \n", state.stage, state.percentage);
+                if (state.percentage > 100 || state.percentage < 0) {
+                    FAIL() << "Invalid percentage(not in 0-100): " << state.percentage << ", encountered during stage " << state.stage << ")";
+                }
+                if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
+                    FAIL() << "Bad percentage(smaller than previous percentage at same stage): " << state.percentage << ", encountered during stage " << state.stage << ")";
+                }
+                if (last_state.stage > state.stage) {
+                    FAIL() << "Bad stage " << state.stage << " - smaller than previous stage, encountered with percentage " << state.percentage;
+                }
+            }
+            last_state = state;
+            getJobState(job, &state);
+        }
+        printf("Done!\n");
+
+        closeJobHandle(job);
+
+    }
+}
+
+TEST(MattanTests, deadlockTest) {
+    for (int i = 0; i < DEADLOCK_REPEATS; ++i)
+    {
+        std::cout<<"repetition #"<<i<<std::endl;
+        CounterClient client;
+        auto s1 = new VString("This string is full of characters");
+        auto s2 = new VString("Multithreading is awesome");
+        auto s3 = new VString("conditions are race bad");
+        client.inputVec.push_back({nullptr, s1});
+        client.inputVec.push_back({nullptr, s2});
+        client.inputVec.push_back({nullptr, s3});
+        JobState state;
+        JobState last_state={UNDEFINED_STAGE,0};
+        JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 3);
+        getJobState(job, &state);
+        while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
+        {
+            last_state = state;
+            getJobState(job, &state);
+        }
+        closeJobHandle(job);
+    }
+}
+
 void randbody(int iterations) {
 
 
@@ -382,102 +466,20 @@ void randbody(int iterations) {
     }
 }
 
-
 TEST(MattanTests, randomTest) {
 	EXPECT_EXIT(randbody(RANDOM_REPEATS), ::testing::KilledBySignal(24), ::testing::MatchesRegex(""));
     //TODO  If you fail this test, comment the line above and uncomment the line below to see what exit code you failed with more easily.
     // The task should be killed by signal 24 (SIGXCPU) which means the cpu time limit was exceeded. That should be the only reason that
     // the task dies. This should happen only after more than 100 iterations. Running sanitizer will slow the program down
     // a lot and could cause a false positive.
+    // Meant to be run on aquarium computers since on private computers you probably won't ever get the kill signal.
 //    randbody(RANDOM_REPEATS);
 
 }
 
 
-TEST(MattanTests, waitAndCloseTest) {
-
-	CounterClient client;
-	auto s1 = new VString("This string is full of characters");
-	auto s2 = new VString("Multithreading is awesome");
-	auto s3 = new VString("conditions are race bad");
-	client.inputVec.push_back({nullptr, s1});
-	client.inputVec.push_back({nullptr, s2});
-	client.inputVec.push_back({nullptr, s3});
-	JobState state;
-	JobState last_state={UNDEFINED_STAGE,0};
-	JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 3);
-	getJobState(job, &state);
-	waitForJob(job);
-
-	// Should work without system error, since we are supposed to check if join has already been called.
-	closeJobHandle(job);
-
-}
 
 
-TEST(MattanTests, progressTest) {
-    for (int i = 0; i < REPEATS; ++i)
-    {
-        std::cout<<"repetition #"<<i<<std::endl;
-        CounterClient client;
-        auto s1 = new VString("This string is full of characters");
-        auto s2 = new VString("Multithreading is awesome");
-        auto s3 = new VString("conditions are race bad");
-        client.inputVec.push_back({nullptr, s1});
-        client.inputVec.push_back({nullptr, s2});
-        client.inputVec.push_back({nullptr, s3});
-        JobState state;
-        JobState last_state={UNDEFINED_STAGE,0};
-        JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 6);
-        getJobState(job, &state);
-
-        while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
-        {
-            if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
-                printf("stage %d, %f%% \n", state.stage, state.percentage);
-                if (state.percentage > 100 || state.percentage < 0) {
-                    FAIL() << "Invalid percentage(not in 0-100): " << state.percentage << ", encountered during stage " << state.stage << ")";
-                }
-                if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
-                    FAIL() << "Bad percentage(smaller than previous percentage at same stage): " << state.percentage << ", encountered during stage " << state.stage << ")";
-                }
-                if (last_state.stage > state.stage) {
-                    FAIL() << "Bad stage " << state.stage << " - smaller than previous stage, encountered with percentage " << state.percentage;
-                }
-            }
-            last_state = state;
-            getJobState(job, &state);
-        }
-        printf("Done!\n");
-
-        closeJobHandle(job);
-
-    }
-}
-
-TEST(MattanTests, deadlockTest) {
-    for (int i = 0; i < DEADLOCK_REPEATS; ++i)
-    {
-        std::cout<<"repetition #"<<i<<std::endl;
-        CounterClient client;
-        auto s1 = new VString("This string is full of characters");
-        auto s2 = new VString("Multithreading is awesome");
-        auto s3 = new VString("conditions are race bad");
-        client.inputVec.push_back({nullptr, s1});
-        client.inputVec.push_back({nullptr, s2});
-        client.inputVec.push_back({nullptr, s3});
-        JobState state;
-        JobState last_state={UNDEFINED_STAGE,0};
-        JobHandle job = startMapReduceJob(client, client.inputVec, client.outputVec, 3);
-        getJobState(job, &state);
-        while (state.stage != REDUCE_STAGE || state.percentage != 100.0)
-        {
-            last_state = state;
-            getJobState(job, &state);
-        }
-        closeJobHandle(job);
-    }
-}
 
 
 
