@@ -384,7 +384,8 @@ TEST(MattanTests, randomTest) {
 	EXPECT_EXIT(randbody(RANDOM_REPEATS), ::testing::KilledBySignal(24), ::testing::MatchesRegex(""));
     //TODO  If you fail this test, comment the line above and uncomment the line below to see what exit code you failed with more easily.
     // The task should be killed by signal 24 (SIGXCPU) which means the cpu time limit was exceeded. That should be the only reason that
-    // the task dies.
+    // the task dies. This should happen only after more than 100 iterations. Running sanitizer will slow the program down
+    // a lot and could cause a false positive.
 //    randbody(RANDOM_REPEATS);
 
 }
