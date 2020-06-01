@@ -11,11 +11,9 @@
 
 //static const int REPEATS = 10000;
 //static const int DEADLOCK_REPEATS = 1000000;
-<<<<<<< HEAD
+
 static const int RANDOM_REPEATS = 2000;
-=======
-static const int RANDOM_REPEATS = 1000;
->>>>>>> 25a5e2c5cf6fea0185963070881ab943688713a5
+
 pthread_mutex_t k2ResourcesMutex = PTHREAD_MUTEX_INITIALIZER;
 
 class VString : public V1 {
@@ -116,10 +114,6 @@ TEST(MattanTests, errorMessageTest) {
 	client.inputVec.push_back({nullptr, s1});
 	client.inputVec.push_back({nullptr, s2});
 	client.inputVec.push_back({nullptr, s3});
-<<<<<<< HEAD
-=======
-
->>>>>>> 25a5e2c5cf6fea0185963070881ab943688713a5
 	ASSERT_EXIT(startMapReduceJob(client, client.inputVec, client.outputVec, 20000000),
 	            ::testing::ExitedWithCode(1),
 	            ::testing::MatchesRegex("system error: .*\n")
