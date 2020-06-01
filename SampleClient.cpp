@@ -280,119 +280,114 @@ TEST(MattanTests, outputTest) {
 	}
 }
 
-<<<<<<< HEAD
+
 void randbody(int iterations) {
-=======
-void randbody() {
->>>>>>> 25a5e2c5cf6fea0185963070881ab943688713a5
-	std::default_random_engine generator(time(nullptr));
-	std::uniform_int_distribution<int> bernouli(0,1);
-	std::uniform_int_distribution<int> trinary(0,2);
-	std::uniform_int_distribution<int> dist(1,1000);
-	std::uniform_int_distribution<int> concurrentJobAmount(1, 20);
-	std::vector<std::uniform_int_distribution<int>> dists;
-
-	std::uniform_int_distribution<int> large_amount(100, 500);
-	std::uniform_int_distribution<int> small_amount(6,100);
-	std::uniform_int_distribution<int> tiny_amount(2,5);
-	dists.push_back(large_amount);
-	dists.push_back(small_amount);
-	dists.push_back(tiny_amount);
 
 
+    std::default_random_engine generator(time(nullptr));
+    std::uniform_int_distribution<int> bernouli(0, 1);
+    std::uniform_int_distribution<int> trinary(0, 2);
+    std::uniform_int_distribution<int> dist(1, 1000);
+    std::uniform_int_distribution<int> concurrentJobAmount(1, 20);
+    std::vector<std::uniform_int_distribution<int>> dists;
 
-<<<<<<< HEAD
-	for (int i = 0; i < iterations; ++i)
-=======
-	for (int i = 0; i < RANDOM_REPEATS; ++i)
->>>>>>> 25a5e2c5cf6fea0185963070881ab943688713a5
-	{
-		int activeJobs = concurrentJobAmount(generator);
+    std::uniform_int_distribution<int> large_amount(100, 500);
+    std::uniform_int_distribution<int> small_amount(6, 100);
+    std::uniform_int_distribution<int> tiny_amount(2, 5);
+    dists.push_back(large_amount);
+    dists.push_back(small_amount);
+    dists.push_back(tiny_amount);
+
+    for (int i = 0; i < iterations; ++i) {
+        int activeJobs = concurrentJobAmount(generator);
 //        std::cout << "Job amount: " << activeJobs << std::endl;
 
-		std::vector<CounterClient>clients(activeJobs);
-		std::vector<JobHandle>jobs(activeJobs, nullptr);
-		std::vector<std::pair<JobState, JobState>> jobStates(activeJobs); // [0]=prevstate [1]=curstate
-		std::vector<int>levels;
-		std::cout<<"repetition #"<<i<<std::endl;
-		int lineAmount = dist(generator);
+        std::vector<CounterClient> clients(activeJobs);
+        std::vector<JobHandle> jobs(activeJobs, nullptr);
+        std::vector<std::pair<JobState, JobState>> jobStates(activeJobs); // [0]=prevstate [1]=curstate
+        std::vector<int> levels;
+        std::cout << "repetition #" << i << std::endl;
+        int lineAmount = dist(generator);
 //        std::cout<<"line amount: "<<lineAmount<<std::endl;
 
-		for (int j = 0; j < activeJobs; ++j)
-		{
+        for (int j = 0; j < activeJobs; ++j) {
 //            std::cout<<"Job number: "<<j<<std::endl;
-			auto& client = clients.at(j);
-			std::vector<std::string> a;
-			std::string line;
-			std::ifstream f(RANDOM_STRINGS_PATH);
-			if (f.is_open()) {
-				int k = 0;
-				while (getline(f, line) && k < lineAmount) {
-					if (bernouli(generator)) {
-						a.push_back(line);
-						k++;
-					}
-				}
-				for (std::string &str : a) {
-					auto v = new VString(str);
-					client.inputVec.push_back({nullptr, v});
-				}
-			} else {
-				FAIL() << "(Technical error) Coludn't find strings file at " << RANDOM_STRINGS_PATH << " - maybe you deleted it by mistake?";
-			}
-			int level = dists[trinary(generator)](generator);
-			levels.push_back(level);
+            auto &client = clients.at(j);
+            std::vector<std::string> a;
+            std::string line;
+            std::ifstream f(RANDOM_STRINGS_PATH);
+            if (f.is_open()) {
+                int k = 0;
+                while (getline(f, line) && k < lineAmount) {
+                    if (bernouli(generator)) {
+                        a.push_back(line);
+                        k++;
+                    }
+                }
+                for (std::string &str : a) {
+                    auto v = new VString(str);
+                    client.inputVec.push_back({nullptr, v});
+                }
+            } else {
+                FAIL() << "(Technical error) Coludn't find strings file at " << RANDOM_STRINGS_PATH
+                       << " - maybe you deleted it by mistake?";
+            }
+            int level = dists[trinary(generator)](generator);
+            levels.push_back(level);
 //            std::cout<<"Thread Amount: "<<level<<std::endl;
-		}
+        }
 
-		jobs.reserve(activeJobs);
-		for (int j = 0; j < activeJobs; ++j) {
+        jobs.reserve(activeJobs);
+        for (int j = 0; j < activeJobs; ++j) {
 //            std::cout<<"job "<<j<<std::endl;
-			auto& client = clients[j];
-			JobHandle handle = startMapReduceJob(client, client.inputVec, client.outputVec, levels[j]);
-			jobs[j] = handle;
-		}
-		int totalJobs = activeJobs;
-		for (int j = 0; activeJobs > 0; ++j)
-		{
-			if (jobs[j] != nullptr) {
-				JobHandle job = jobs[j];
-				JobState &state = jobStates[j].second;
-				getJobState(job, &state);
-				JobState &last_state = jobStates[j].first;
-				if (!(state.stage == REDUCE_STAGE && last_state.percentage == 100.0)) {
-					if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
-						if (state.percentage > 100 || state.percentage < 0) {
-							FAIL() << "Invalid percentage(not in 0-100): " <<
-							       "Current stage:" << state.stage << " "<< state.percentage << "%" << std::endl <<
-							       "Previous stage: " <<last_state.stage << " "<< last_state.percentage << "%" << std::endl;
-						}
-						if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
-							FAIL() << "Bad percentage(smaller than previous percentage at same stage): "<<
-							       "Current stage:" << state.stage << " "<< state.percentage << "%" << std::endl <<
-							       "Previous stage:" <<last_state.stage << " "<<  last_state.percentage << "%" << std::endl;
-						}
-						if (last_state.stage > state.stage) {
-							FAIL() << "Bad stage: " <<
-							       "Current stage:" << state.stage << " "<< state.percentage << "%" << std::endl <<
-							       "Previous stage:" <<last_state.stage<< " "<<  last_state.percentage << "%" << std::endl;
-						}
-					}
-					last_state = state;
-					getJobState(job, &state);
-				}
-				else {
-					closeJobHandle(job);
-					jobs[j] = nullptr;
-					activeJobs--;
-				}
-			}
-			if (j == totalJobs - 1) {
-				j = -1;
-			}
-		}
+            auto &client = clients[j];
+            JobHandle handle = startMapReduceJob(client, client.inputVec, client.outputVec, levels[j]);
+            jobs[j] = handle;
+        }
+        int totalJobs = activeJobs;
+        for (int j = 0; activeJobs > 0; ++j) {
+            if (jobs[j] != nullptr) {
+                JobHandle job = jobs[j];
+                JobState &state = jobStates[j].second;
+                getJobState(job, &state);
+                JobState &last_state = jobStates[j].first;
+                if (!(state.stage == REDUCE_STAGE && last_state.percentage == 100.0)) {
+                    if (last_state.stage != state.stage || last_state.percentage != state.percentage) {
+                        if (state.percentage > 100 || state.percentage < 0) {
+                            FAIL() << "Invalid percentage(not in 0-100): " <<
+                                   "Current stage:" << state.stage << " " << state.percentage << "%" << std::endl <<
+                                   "Previous stage: " << last_state.stage << " " << last_state.percentage << "%"
+                                   << std::endl;
+                        }
+                        if (last_state.stage == state.stage && state.percentage < last_state.percentage) {
+                            FAIL() << "Bad percentage(smaller than previous percentage at same stage): " <<
+                                   "Current stage:" << state.stage << " " << state.percentage << "%" << std::endl <<
+                                   "Previous stage:" << last_state.stage << " " << last_state.percentage << "%"
+                                   << std::endl;
+                        }
+                        if (last_state.stage > state.stage) {
+                            FAIL() << "Bad stage: " <<
+                                   "Current stage:" << state.stage << " " << state.percentage << "%" << std::endl <<
+                                   "Previous stage:" << last_state.stage << " " << last_state.percentage << "%"
+                                   << std::endl;
+                        }
+                    }
+                    last_state = state;
+                    getJobState(job, &state);
+                } else {
+                    closeJobHandle(job);
+                    jobs[j] = nullptr;
+                    activeJobs--;
+                }
+            }
+            if (j == totalJobs - 1) {
+                j = -1;
+            }
+        }
 
-	}
+    }
+}
+
 
 TEST(MattanTests, randomTest) {
 	EXPECT_EXIT(randbody(RANDOM_REPEATS), ::testing::KilledBySignal(24), ::testing::MatchesRegex(""));
